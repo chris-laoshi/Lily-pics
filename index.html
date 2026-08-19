@@ -1,0 +1,295 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="UTF-8">
+<meta name="viewport" content="width=device-width, initial-scale=1.0, maximum-scale=1.0, user-scalable=no">
+<title>Photo Gallery</title>
+<style>
+  :root{
+    --bg:#14181c;
+    --panel:#1d2329;
+    --text:#eef1f3;
+    --muted:#8b95a1;
+    --accent:#5aa9e6;
+    --accent-text:#0b1114;
+  }
+  *{box-sizing:border-box;}
+  html,body{
+    margin:0;
+    height:100%;
+    background:var(--bg);
+    color:var(--text);
+    font-family:-apple-system,BlinkMacSystemFont,"Segoe UI",Roboto,Helvetica,Arial,sans-serif;
+    overscroll-behavior:none;
+  }
+  body{
+    display:flex;
+    flex-direction:column;
+  }
+  header{
+    padding:14px 18px 10px;
+    text-align:center;
+    flex-shrink:0;
+  }
+  header h1{
+    margin:0;
+    font-size:1.05rem;
+    font-weight:600;
+    letter-spacing:.01em;
+  }
+  header .counter{
+    margin-top:4px;
+    font-size:.85rem;
+    color:var(--muted);
+  }
+  .viewer{
+    flex:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    position:relative;
+    min-height:0;
+    padding:0 8px;
+  }
+  .stage{
+    position:relative;
+    width:100%;
+    height:100%;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    overflow:hidden;
+    touch-action:pan-y;
+  }
+  .stage img{
+    max-width:100%;
+    max-height:100%;
+    object-fit:contain;
+    border-radius:10px;
+    background:var(--panel);
+    user-select:none;
+    -webkit-user-drag:none;
+  }
+  .nav-btn{
+    position:absolute;
+    top:50%;
+    transform:translateY(-50%);
+    background:rgba(20,24,28,.55);
+    border:1px solid rgba(255,255,255,.12);
+    color:var(--text);
+    width:44px;
+    height:44px;
+    border-radius:50%;
+    font-size:1.3rem;
+    line-height:1;
+    display:flex;
+    align-items:center;
+    justify-content:center;
+    cursor:pointer;
+    backdrop-filter:blur(4px);
+  }
+  .nav-btn:active{transform:translateY(-50%) scale(.92);}
+  .nav-btn.prev{left:10px;}
+  .nav-btn.next{right:10px;}
+  .nav-btn:disabled{opacity:.25;pointer-events:none;}
+
+  .thumbs{
+    display:flex;
+    gap:6px;
+    overflow-x:auto;
+    padding:10px 14px;
+    flex-shrink:0;
+    -webkit-overflow-scrolling:touch;
+  }
+  .thumbs img{
+    width:44px;
+    height:44px;
+    object-fit:cover;
+    border-radius:6px;
+    opacity:.5;
+    cursor:pointer;
+    flex-shrink:0;
+    border:2px solid transparent;
+    transition:opacity .15s, border-color .15s;
+  }
+  .thumbs img.active{
+    opacity:1;
+    border-color:var(--accent);
+  }
+
+  footer{
+    padding:12px 18px 20px;
+    display:flex;
+    justify-content:center;
+    flex-shrink:0;
+  }
+  .download-btn{
+    background:var(--accent);
+    color:var(--accent-text);
+    border:none;
+    font-weight:600;
+    font-size:.95rem;
+    padding:12px 26px;
+    border-radius:999px;
+    cursor:pointer;
+    display:flex;
+    align-items:center;
+    gap:8px;
+  }
+  .download-btn:active{transform:scale(.97);}
+  .download-btn svg{width:18px;height:18px;}
+  .status{
+    text-align:center;
+    font-size:.78rem;
+    color:var(--muted);
+    min-height:16px;
+    padding-bottom:4px;
+  }
+</style>
+</head>
+<body>
+
+<header>
+  <h1>Photos</h1>
+  <div class="counter" id="counter">1 / 21</div>
+</header>
+
+<div class="viewer">
+  <button class="nav-btn prev" id="prevBtn" aria-label="Previous">&#8249;</button>
+  <div class="stage" id="stage">
+    <img id="mainImg" src="" alt="Photo">
+  </div>
+  <button class="nav-btn next" id="nextBtn" aria-label="Next">&#8250;</button>
+</div>
+
+<div class="thumbs" id="thumbs"></div>
+<div class="status" id="status"></div>
+
+<footer>
+  <button class="download-btn" id="downloadBtn">
+    <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2" stroke-linecap="round" stroke-linejoin="round"><path d="M12 3v12"/><path d="m7 10 5 5 5-5"/><path d="M5 21h14"/></svg>
+    Download this photo
+  </button>
+</footer>
+
+<script>
+  // ---- Put all image links here, in the order you want them shown ----
+  const IMAGES = [
+    "https://i.postimg.cc/pL3MWgc1/20250908-151910.jpg",
+    "https://i.postimg.cc/G3z08BSM/20250912-144149.jpg",
+    "https://i.postimg.cc/8CWQjtqN/20250924-151358.jpg",
+    "https://i.postimg.cc/VkJccYgq/20250926-151229.jpg",
+    "https://i.postimg.cc/g2xPPYsQ/20251015-143927.jpg",
+    "https://i.postimg.cc/jSDrrsc8/20251029-145116.jpg",
+    "https://i.postimg.cc/g21bzfB0/20251029-154034.jpg",
+    "https://i.postimg.cc/G2C0YvR1/20251114-153123.jpg",
+    "https://i.postimg.cc/dQnMk7Sz/20251124-155024.jpg",
+    "https://i.postimg.cc/W36B7tpb/20251124-155134.jpg",
+    "https://i.postimg.cc/zBrmWTrK/20251222-155234.jpg",
+    "https://i.postimg.cc/3wp5dnPN/20260213-142930.jpg",
+    "https://i.postimg.cc/R0f5NXjK/20260225-144827.jpg",
+    "https://i.postimg.cc/B60WD20B/20260318-155023.jpg",
+    "https://i.postimg.cc/j2xG3KCw/20260717-155706.jpg",
+    "https://i.postimg.cc/VvK23Tbq/20260812-151528.jpg",
+    "https://i.postimg.cc/nr3N65Q1/20260812-151530.jpg",
+    "https://i.postimg.cc/brm4KM25/20260814-143109.jpg",
+    "https://i.postimg.cc/XqstThCb/20260814-143111.jpg",
+    "https://i.postimg.cc/Df5VJWYS/20260814-143116.jpg",
+    "https://i.postimg.cc/NGbh9yP6/20260814-143117.jpg"
+  ];
+
+  let current = 0;
+
+  const mainImg = document.getElementById('mainImg');
+  const counter = document.getElementById('counter');
+  const thumbsEl = document.getElementById('thumbs');
+  const prevBtn = document.getElementById('prevBtn');
+  const nextBtn = document.getElementById('nextBtn');
+  const downloadBtn = document.getElementById('downloadBtn');
+  const statusEl = document.getElementById('status');
+  const stage = document.getElementById('stage');
+
+  function buildThumbs(){
+    IMAGES.forEach((url, i) => {
+      const t = document.createElement('img');
+      t.src = url;
+      t.loading = 'lazy';
+      t.addEventListener('click', () => show(i));
+      thumbsEl.appendChild(t);
+    });
+  }
+
+  function show(i){
+    current = ((i % IMAGES.length) + IMAGES.length) % IMAGES.length;
+    mainImg.src = IMAGES[current];
+    counter.textContent = (current + 1) + ' / ' + IMAGES.length;
+    statusEl.textContent = '';
+    [...thumbsEl.children].forEach((el, idx) => {
+      el.classList.toggle('active', idx === current);
+      if (idx === current) el.scrollIntoView({inline:'center', block:'nearest', behavior:'smooth'});
+    });
+    prevBtn.disabled = false;
+    nextBtn.disabled = false;
+  }
+
+  prevBtn.addEventListener('click', () => show(current - 1));
+  nextBtn.addEventListener('click', () => show(current + 1));
+
+  document.addEventListener('keydown', (e) => {
+    if (e.key === 'ArrowLeft') show(current - 1);
+    if (e.key === 'ArrowRight') show(current + 1);
+  });
+
+  // Swipe support
+  let touchStartX = null;
+  stage.addEventListener('touchstart', (e) => {
+    touchStartX = e.changedTouches[0].clientX;
+  }, {passive:true});
+  stage.addEventListener('touchend', (e) => {
+    if (touchStartX === null) return;
+    const dx = e.changedTouches[0].clientX - touchStartX;
+    if (Math.abs(dx) > 40){
+      if (dx < 0) show(current + 1); else show(current - 1);
+    }
+    touchStartX = null;
+  }, {passive:true});
+
+  function filenameFromUrl(url){
+    try {
+      const clean = url.split('?')[0];
+      return clean.substring(clean.lastIndexOf('/') + 1) || 'photo.jpg';
+    } catch(e){
+      return 'photo.jpg';
+    }
+  }
+
+  downloadBtn.addEventListener('click', async () => {
+    const url = IMAGES[current];
+    const name = filenameFromUrl(url);
+    statusEl.textContent = 'Preparing download...';
+    try {
+      const res = await fetch(url, {mode:'cors'});
+      if (!res.ok) throw new Error('bad response');
+      const blob = await res.blob();
+      const blobUrl = URL.createObjectURL(blob);
+      const a = document.createElement('a');
+      a.href = blobUrl;
+      a.download = name;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      URL.revokeObjectURL(blobUrl);
+      statusEl.textContent = 'Downloaded.';
+    } catch(err){
+      // Fallback: open the image in a new tab so the parent can save it manually
+      statusEl.textContent = 'Opening photo in a new tab — press and hold (or right-click) to save it.';
+      window.open(url, '_blank');
+    }
+  });
+
+  buildThumbs();
+  show(0);
+</script>
+
+</body>
+</html>
