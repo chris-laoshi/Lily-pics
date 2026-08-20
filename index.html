@@ -69,7 +69,22 @@
     background:var(--panel);
     user-select:none;
     -webkit-user-drag:none;
+    opacity:0;
+    transition:opacity .2s ease;
   }
+  .stage img.loaded{opacity:1;}
+  .spinner{
+    position:absolute;
+    width:34px;
+    height:34px;
+    border-radius:50%;
+    border:3px solid rgba(255,255,255,.15);
+    border-top-color:var(--accent);
+    animation:spin .8s linear infinite;
+    display:none;
+  }
+  .spinner.show{display:block;}
+  @keyframes spin{to{transform:rotate(360deg);}}
   .nav-btn{
     position:absolute;
     top:50%;
@@ -157,6 +172,7 @@
 <div class="viewer">
   <button class="nav-btn prev" id="prevBtn" aria-label="Previous">&#8249;</button>
   <div class="stage" id="stage">
+    <div class="spinner" id="spinner"></div>
     <img id="mainImg" src="" alt="Photo">
   </div>
   <button class="nav-btn next" id="nextBtn" aria-label="Next">&#8250;</button>
@@ -209,20 +225,61 @@
   const downloadBtn = document.getElementById('downloadBtn');
   const statusEl = document.getElementById('status');
   const stage = document.getElementById('stage');
+  const spinner = document.getElementById('spinner');
+
+  const thumbObserver = new IntersectionObserver((entries) => {
+    entries.forEach(entry => {
+      if (entry.isIntersecting){
+        const img = entry.target;
+        if (!img.src) img.src = img.dataset.src;
+        thumbObserver.unobserve(img);
+      }
+    });
+  }, {root: thumbsEl, rootMargin: '150px'});
 
   function buildThumbs(){
     IMAGES.forEach((url, i) => {
       const t = document.createElement('img');
-      t.src = url;
+      t.dataset.src = url;
       t.loading = 'lazy';
+      t.decoding = 'async';
       t.addEventListener('click', () => show(i));
       thumbsEl.appendChild(t);
+      thumbObserver.observe(t);
     });
+  }
+
+  // Cache of Image() objects already fetched, so revisiting a photo is instant
+  const preloaded = {};
+  function preload(i){
+    if (i < 0 || i >= IMAGES.length || preloaded[i]) return;
+    const im = new Image();
+    im.src = IMAGES[i];
+    preloaded[i] = im;
   }
 
   function show(i){
     current = ((i % IMAGES.length) + IMAGES.length) % IMAGES.length;
-    mainImg.src = IMAGES[current];
+    const url = IMAGES[current];
+
+    spinner.classList.add('show');
+    mainImg.classList.remove('loaded');
+
+    // If already preloaded/cached, swap in instantly
+    const cached = preloaded[current];
+    if (cached && cached.complete){
+      mainImg.src = url;
+      spinner.classList.remove('show');
+      mainImg.classList.add('loaded');
+    } else {
+      mainImg.onload = () => {
+        spinner.classList.remove('show');
+        mainImg.classList.add('loaded');
+      };
+      mainImg.src = url;
+      preloaded[current] = mainImg; // mark in-flight/loaded via the visible element too
+    }
+
     counter.textContent = (current + 1) + ' / ' + IMAGES.length;
     statusEl.textContent = '';
     [...thumbsEl.children].forEach((el, idx) => {
@@ -231,6 +288,10 @@
     });
     prevBtn.disabled = false;
     nextBtn.disabled = false;
+
+    // Quietly fetch just the neighbors so Next/Prev feels instant
+    preload(current + 1);
+    preload(current - 1);
   }
 
   prevBtn.addEventListener('click', () => show(current - 1));
